@@ -8,6 +8,10 @@ from Language import *
 df_of_train_tweets = None
 #store list of language models
 list_of_languages = []
+#store parameters
+vocabulary = None
+size = None
+smoothing = None
 
 language_symbol = {
     'eu': 'basque',
@@ -19,44 +23,90 @@ language_symbol = {
 }
 
 n_gram = {
-    'unigram':1,
+    'unigram': 1,
     'bigram' : 2,
-    'trigram':3
+    'trigram': 3
 }
 
+#TO-DO make sure A is counted as a and vice versa for vocabulary_all_case. now it is not doing it, skips A
 vocabulary_lowercase = string.ascii_lowercase
 vocabulary_all_case = string.ascii_letters
 
 def main():
+    set_parameters()
+    trainModel('training-tweets.txt')
+    scoreNewTweets('test-tweets-given.txt')
+
+#ToDO take input parameters from user input
+def set_parameters():
+    #clean data
+    clean_up()
+    #set parameters
+    global vocabulary, size
+    vocabulary = vocabulary_lowercase
+    size = n_gram['unigram']
+
+def trainModel(training_filename):
     #create training dataset
-    training_tweets = readTweetsFromFile('training-tweets.txt')
+    training_tweets = readTweetsFromFile(training_filename)
     global df_of_train_tweets 
     df_of_train_tweets = pd.DataFrame.from_dict(training_tweets) 
     #create model for each language, based on training set
-    createLanguageModel(vocabulary_all_case)
+    createLanguageModel(vocabulary)
     #build n-grams for each language
-    buidNgramModel(vocabulary_all_case, n_gram['bigram'])
+    buidNgramModel(vocabulary, size)
     #score new tweets
-    #scoreNewTweets('test-tweets-given.txt')
-    
+
 def scoreNewTweets(filename):
     test_tweets = readTweetsFromFile(filename)
     df_of_test_tweets = pd.DataFrame.from_dict(test_tweets) 
     list_of_guesses = []
     for index, row in df_of_test_tweets.iterrows():
-        list_of_guesses.append(prob_of_language(row['Content']))
+        if vocabulary == vocabulary_lowercase:
+            list_of_guesses.append(prob_of_language(row['Content'].lower()))
+        else:
+            list_of_guesses.append(prob_of_language(row['Content']))
     df_of_test_tweets['guess'] = list_of_guesses
-    
+
     guess_status = []
     for index, row in df_of_test_tweets.iterrows():
         if row['Language'] == row['guess']:
-            guess_status.append(True)
+            guess_status.append('correct')
         else:
-            guess_status.append(False)
+            guess_status.append('wrong')
     df_of_test_tweets['Status'] = guess_status
 
-#to-do this is super slow!
+    with open('trace.txt', 'w') as file:
+        for index, row in df_of_test_tweets.iterrows():
+            file.write(row['TweetID'] + "  " + row['guess'] + "  " + row['Language'] + "  " + row['Status'] + "\n")
+        file.close()
+
 def prob_of_language(line):
+    if size == n_gram['unigram']:
+        return prob_of_language_unigram(line)
+    elif size == n_gram['bigram']:
+        return prob_of_language_bigram(line)
+
+def prob_of_language_bigram(line):
+    best_probability = float('-inf')
+    best_language = None
+    for language in list_of_languages:
+        language_probablitity = math.log10(language.probability)
+        for i in range(len(line)-2):
+            #skip out of vacabulary characters
+            if (line[i] not in vocabulary) or (line[i+1] not in vocabulary):
+                continue
+            #skip probability 0
+            if language.bigram.loc[line[i], line[i+1]] != 0:
+                language_probablitity += math.log10(language.bigram.loc[line[i], line[i+1]])
+
+        if language_probablitity > best_probability:
+            best_probability = language_probablitity
+            best_language = language.symbol   
+    return best_language
+
+#to-do this is super slow!
+def prob_of_language_unigram(line):
     best_probability = float('-inf')
     best_language = None
     for language in list_of_languages:
@@ -64,11 +114,13 @@ def prob_of_language(line):
         for character in line:
             if character in language.vocabulary:
                 character_probability = language.unigram.loc[character]['Probability']
-                total_probability *= math.log(character_probability)
+                total_probability += math.log(character_probability)
         if total_probability > best_probability:
             best_probability = total_probability
             best_language = language.symbol
     return best_language
+
+
 
 def readTweetsFromFile(fileName):
     with open(fileName, encoding='utf8') as file:
@@ -81,7 +133,7 @@ def readTweetsFromFile(fileName):
                 content_list.append(tweet.strip())
             except ValueError:
                 pass
-        data = {'Language': language_list, 'Content': content_list}
+        data = {'TweetID': tweet_id, 'Language': language_list, 'Content': content_list}
         return data
 
 def createLanguageModel(vocabulary):
@@ -96,10 +148,10 @@ def createLanguageModel(vocabulary):
 def buidNgramModel(vocabulary, n_gram):
 
     n_gram_dataset = createDataset(vocabulary, n_gram)
-    
     #create n-gram for each language
     global list_of_languages
     for language in list_of_languages:
+    #language = list_of_languages[0]
         if n_gram == 1:
             #calculate instances of each character
             language.unigram = n_gram_dataset.copy()
@@ -116,16 +168,17 @@ def buidNgramModel(vocabulary, n_gram):
             language_as_String = ''.join(language.dataset['Content'])
             list_of_letters_x = [character for character in language.vocabulary]
             list_of_letters_y = [character for character in language.vocabulary]
+            #first count each character and add it to the dataset
             for x in list_of_letters_x:
                 for y in list_of_letters_y:
                     language.bigram.loc[x, y] = language_as_String.count(x+y)
                 language.bigram.loc[x,'instances'] = language.bigram.loc[x].sum()
-            #calculate probablility of each character
-            #to do need to calculate sum first
-            for index, row in language.bigram.iterrows():
-                row['Probability'] = row['instances']/total_instances
-
-
+            #calculate probability of each set of characters
+            for x in list_of_letters_x:
+                for y in list_of_letters_y:
+                    language.bigram.loc[x, y] = language.bigram.loc[x, y] / language.bigram.loc[x,'instances']
+        
+#Create an empty datagram. It will later be copied over for each language
 def createDataset(vocabulary, n_gram):
     #depending on the vocabulary and size of n_gram, create Dataframe with all letters
     list_of_letters = [character for character in vocabulary] 
@@ -139,5 +192,8 @@ def createDataset(vocabulary, n_gram):
         new_list_of_letters.append('instances')
         n_gram_dataset = pd.DataFrame(np.zeros((len(vocabulary),len(vocabulary)+1)), columns=new_list_of_letters, index=list_of_letters)
     return n_gram_dataset
+
+def clean_up():
+    list_of_languages.clear()
 
 main()
