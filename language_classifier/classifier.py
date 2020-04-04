@@ -5,7 +5,7 @@ import math
 from Language import *
 from decimal import Decimal
 import sys
-
+# -*- coding: utf-8 -*-
 #store training dataset
 df_of_train_tweets = None
 #store list of language models
@@ -48,6 +48,8 @@ def print_info(vocabulary_choice, ngram_choice, smoothing_value):
         vocab = 'allcase'
     elif vocabulary_choice == 3:
         vocab = 'isalpha'
+    elif vocabulary_choice == 4:
+        vocab = 'special'
     if ngram_choice == 1:
         ngram = 'unigram'
     elif ngram_choice == 2:
@@ -64,11 +66,14 @@ def set_parameters(vocabulary_choice, ngram_size, smoothing_value):
     #set parameters
     global vocabulary, size, smoothing
     if vocabulary_choice == 1:
-        vocabulary = string.ascii_lowercase
+        vocabulary = string.ascii_lowercase 
     elif vocabulary_choice == 2:
         vocabulary = string.ascii_letters
     elif vocabulary_choice == 3:  # use isalpha()
         vocabulary = None
+    elif vocabulary_choice == 4:
+        vocabulary = string.ascii_lowercase +u'ó' +u'ñ' + u'í' +u'é'
+    
     size = ngram_size
     smoothing = smoothing_value
 
@@ -102,9 +107,12 @@ def scoreNewTweets(filename, vocabulary_choice):
     df_of_test_tweets['probability'] = list_of_probabilities
 
     guess_status = []
+    coun = 0
     for index, row in df_of_test_tweets.iterrows():
         if row['Language'] == row['guess']:
             guess_status.append('correct')
+            coun = coun + 1
+            print(coun)
         else:
             guess_status.append('wrong')
     df_of_test_tweets['Status'] = guess_status
@@ -137,6 +145,7 @@ def prob_of_language_bigram(line):
             best_probability = language_probablitity
             best_language = language.symbol   
     return (best_language, best_probability)
+    
 
 
 #to-do this is super slow!
