@@ -35,9 +35,26 @@ vocabulary_lowercase = string.ascii_lowercase
 vocabulary_all_case = string.ascii_letters
 
 def main():
-    set_parameters(sys.argv[1], sys.argv[2], sys.argv[3])
+    set_parameters(int(sys.argv[1]), int(sys.argv[2]), float(sys.argv[3]))
+    print_info(int(sys.argv[1]), int(sys.argv[2]), float(sys.argv[3]))
     trainModel('training-tweets.txt')
-    scoreNewTweets('test-tweets-given.txt')
+    scoreNewTweets('test-tweets-given.txt', sys.argv[1])
+
+
+def print_info(vocabulary_choice, ngram_choice, smoothing_value):
+    if vocabulary_choice == 1:
+        vocab = 'lowercase'
+    elif vocabulary_choice == 2:
+        vocab = 'allcase'
+    elif vocabulary_choice == 3:
+        vocab = 'isalpha'
+    if ngram_choice == 1:
+        ngram = 'unigram'
+    elif ngram_choice == 2:
+        ngram = 'bigram'
+    elif ngram_choice == 3:
+        ngram = 'trigram'
+    print(f'You have chosen {vocab} {ngram} {smoothing_value}')
 
 
 #TODO take input parameters from user input?
@@ -65,24 +82,23 @@ def trainModel(training_filename):
     divide_tweets_by_language()
     #build n-grams for each language
     buidNgramModel()
-    #score new tweets
 
 
-def scoreNewTweets(filename):
+def scoreNewTweets(filename, vocabulary_choice):
     test_tweets = readTweetsFromFile(filename)
     df_of_test_tweets = pd.DataFrame.from_dict(test_tweets) 
-    list_of_langauge_guesses = []
+    list_of_language_guesses = []
     list_of_probabilities = []
     for index, row in df_of_test_tweets.iterrows():
         #ToDO can we call this without tolower?
-        if vocabulary == vocabulary_lowercase:
-            resulting_touple = prob_of_language(row['Content'].lower())
+        if vocabulary_choice == 1:
+            resulting_tuple = prob_of_language(row['Content'].lower())
         else:
-            resulting_touple = prob_of_language(row['Content'])
-        list_of_langauge_guesses.append(resulting_touple[0])
-        list_of_probabilities.append('%.2E' % Decimal(resulting_touple[1]))
+            resulting_tuple = prob_of_language(row['Content'])
+        list_of_language_guesses.append(resulting_tuple[0])
+        list_of_probabilities.append('%.2E' % Decimal(resulting_tuple[1]))
 
-    df_of_test_tweets['guess'] = list_of_langauge_guesses
+    df_of_test_tweets['guess'] = list_of_language_guesses
     df_of_test_tweets['probability'] = list_of_probabilities
 
     guess_status = []
@@ -104,6 +120,8 @@ def prob_of_language(line):
         return prob_of_language_unigram(line)
     elif size == n_gram['bigram']:
         return prob_of_language_bigram(line)
+    elif size == n_gram['trigram']:
+        return prob_of_language_trigram(line)
 
 
 def prob_of_language_bigram(line):
@@ -111,14 +129,10 @@ def prob_of_language_bigram(line):
     best_language = None
     for language in list_of_languages:
         language_probablitity = math.log10(language.probability)
-        for i in range(len(line)-2):
-            #skip out of vacabulary characters
-            if (line[i] not in vocabulary) or (line[i+1] not in vocabulary):
-                continue
-            #skip probability 0
-            if language.bigram.loc[line[i], line[i+1]] != 0:
-                language_probablitity += math.log10(language.bigram.loc[line[i], line[i+1]])
-
+        for i in range(len(line)-1):
+            bigram_substring = line[i] + line[i + 1]
+            if valid_characters(bigram_substring):
+                language_probablitity += math.log10(language.bigram.loc[line[i], line[i + 1]])
         if language_probablitity > best_probability:
             best_probability = language_probablitity
             best_language = language.symbol   
@@ -139,6 +153,31 @@ def prob_of_language_unigram(line):
             best_probability = total_probability
             best_language = language.symbol
     return (best_language, best_probability)
+
+
+def prob_of_language_trigram(line):
+    best_probability = float('-inf')
+    best_language = None
+    for language in list_of_languages:
+        total_probability = math.log10(language.probability)
+        for i in range(len(line)-2):
+            trigram_substring = line[i] + line[i + 1] + line[i + 2]
+            if valid_characters(trigram_substring):
+                language_probability = language.trigram.loc[trigram_substring]['Probability']
+                total_probability += math.log10(language_probability)
+        if total_probability > best_probability:
+            best_probability = total_probability
+            best_language = language.symbol
+    return (best_language, best_probability)
+
+
+def valid_characters(characters):
+    for character in characters:
+        if character in vocabulary:
+            pass
+        else:
+            return False
+    return True
 
 
 def readTweetsFromFile(fileName):
@@ -196,7 +235,6 @@ def buidNgramModel():
             for x in list_of_letters_x:
                 for y in list_of_letters_y:
                     language.bigram.loc[x, y] = language.bigram.loc[x, y] / language.bigram.loc[x,'instances']
-            print(language.bigram)
         elif size == 3:
             language_as_string = ''.join(language.dataset['Content'])
             all_permutations_as_list = []
@@ -211,7 +249,6 @@ def buidNgramModel():
             language.trigram = pd.DataFrame({'Characters': all_permutations_as_list, 'Instances': list_of_instances})
             language.trigram.set_index('Characters', inplace=True)
             language.trigram['Probability'] = language.trigram['Instances']/language.trigram['Instances'].sum()
-
 
 
 #Create an empty datagram. It will later be copied over for each language
