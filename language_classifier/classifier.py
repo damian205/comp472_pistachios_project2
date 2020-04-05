@@ -3,6 +3,7 @@ import numpy as np
 import string
 import math
 from Language import *
+from Evaluation import *
 from decimal import Decimal
 import sys
 # -*- coding: utf-8 -*-
@@ -13,6 +14,8 @@ list_of_languages = []
 #store parameters
 vocabulary = None
 size = None
+vocabulary_integer = None
+size_integer = None
 smoothing = None
 
 language_symbol = {
@@ -42,13 +45,13 @@ def main():
 
 
 def print_info(vocabulary_choice, ngram_choice, smoothing_value):
-    if vocabulary_choice == 1:
+    if vocabulary_choice == 0:
         vocab = 'lowercase'
-    elif vocabulary_choice == 2:
+    elif vocabulary_choice == 1:
         vocab = 'allcase'
-    elif vocabulary_choice == 3:
+    elif vocabulary_choice == 2:
         vocab = 'isalpha'
-    elif vocabulary_choice == 4:
+    elif vocabulary_choice == 3:
         vocab = 'special'
     if ngram_choice == 1:
         ngram = 'unigram'
@@ -64,17 +67,22 @@ def set_parameters(vocabulary_choice, ngram_size, smoothing_value):
     #clean data
     clean_up()
     #set parameters
-    global vocabulary, size, smoothing
-    if vocabulary_choice == 1:
+    global vocabulary, vocabulary_integer, size, size_integer, smoothing
+    if vocabulary_choice == 0:
         vocabulary = string.ascii_lowercase 
-    elif vocabulary_choice == 2:
+        vocabulary_integer = 0
+    elif vocabulary_choice == 1:
         vocabulary = string.ascii_letters
-    elif vocabulary_choice == 3:  # use isalpha()
+        vocabulary_integer = 1
+    elif vocabulary_choice == 2:  # use isalpha()
         vocabulary = None
-    elif vocabulary_choice == 4:
+        vocabulary_integer = 2
+    elif vocabulary_choice == 3:
         vocabulary = string.ascii_lowercase +u'ó' +u'ñ' + u'í' +u'é'
+        vocabulary_integer = 3
     
     size = ngram_size
+    size_integer = ngram_size
     smoothing = smoothing_value
 
 
@@ -95,7 +103,6 @@ def scoreNewTweets(filename, vocabulary_choice):
     list_of_language_guesses = []
     list_of_probabilities = []
     for index, row in df_of_test_tweets.iterrows():
-        #ToDO can we call this without tolower?
         if vocabulary_choice == 1:
             resulting_tuple = prob_of_language(row['Content'].lower())
         else:
@@ -105,21 +112,38 @@ def scoreNewTweets(filename, vocabulary_choice):
 
     df_of_test_tweets['guess'] = list_of_language_guesses
     df_of_test_tweets['probability'] = list_of_probabilities
+    evaluate_scores(df_of_test_tweets)
+    
 
+def evaluate_scores(result_df):
     guess_status = []
-    coun = 0
-    for index, row in df_of_test_tweets.iterrows():
+    correct_guess = 0
+    evaluation_dictionary = dict.fromkeys(language_symbol.keys(),Evaluation()) 
+    for index, row in result_df.iterrows():
         if row['Language'] == row['guess']:
             guess_status.append('correct')
-            coun = coun + 1
-            print(coun)
+            correct_guess += 1
+            evaluation_dictionary.get(row['Language']).true_positive += 1
         else:
             guess_status.append('wrong')
-    df_of_test_tweets['Status'] = guess_status
+    result_df['Status'] = guess_status
+    #calculate stats
+    accuracy = correct_guess / len(result_df) 
+    create_output_files(result_df, accuracy, evaluation_dictionary)
 
-    with open('trace.txt', 'w') as file:
-        for index, row in df_of_test_tweets.iterrows():
-            file.write(row['TweetID'] + "  " + row['guess'] + "  "+ row['probability'] + " " + row['Language'] + "  " + row['Status'] + "\n")
+
+def create_output_files(result, accuracy, evaluation):
+    #create trace file
+    trace_filename = 'trace_'+str(vocabulary_integer)+'_'+str(size_integer)+'_'+str(smoothing)+'.txt'
+    #create evaluation file
+    evaluation_filename = 'eval_'+str(vocabulary_integer)+'_'+str(size_integer)+'_'+str(smoothing)+'.txt'
+    with open(trace_filename, 'w', encoding="utf-8") as file:
+        file.write(str(accuracy) + "\n")
+        file.close()
+
+    with open(evaluation_filename, 'w', encoding="utf-8") as file:
+        for index, row in result.iterrows():
+            file.write(row['TweetID'] + "  " + row['guess'] + "  "+ row['probability'] + "  " + row['Language'] + "  " + row['Status'] + "\n")
         file.close()
 
 
@@ -193,14 +217,16 @@ def readTweetsFromFile(fileName):
     with open(fileName, encoding='utf8') as file:
         language_list = []
         content_list = []
+        tweetid_list = []
         for line in file.readlines():
             try:
                 tweet_id, user_name, language, tweet = line.split(maxsplit=3)
                 language_list.append(language.strip())
                 content_list.append(tweet.strip())
+                tweetid_list.append(tweet_id.strip())
             except ValueError:
-                pass
-        data = {'TweetID': tweet_id, 'Language': language_list, 'Content': content_list}
+                pass 
+        data = {'TweetID': tweetid_list, 'Language': language_list, 'Content': content_list}
         return data
 
 
