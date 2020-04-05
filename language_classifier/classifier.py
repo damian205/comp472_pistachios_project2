@@ -103,7 +103,7 @@ def scoreNewTweets(filename, vocabulary_choice):
     list_of_language_guesses = []
     list_of_probabilities = []
     for index, row in df_of_test_tweets.iterrows():
-        if vocabulary_choice == 1:
+        if vocabulary_choice == 0:
             resulting_tuple = prob_of_language(row['Content'].lower())
         else:
             resulting_tuple = prob_of_language(row['Content'])
