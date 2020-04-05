@@ -74,8 +74,8 @@ def set_parameters(vocabulary_choice, ngram_size, smoothing_value):
     elif vocabulary_choice == 1:
         vocabulary = string.ascii_letters
         vocabulary_integer = 1
-    elif vocabulary_choice == 2:  # use isalpha()
-        vocabulary = None
+    elif vocabulary_choice == 2: 
+        vocabulary = string.ascii_letters
         vocabulary_integer = 2
     elif vocabulary_choice == 3:
         vocabulary = string.ascii_lowercase +u'ó' +u'ñ' + u'í' +u'é'
@@ -118,8 +118,14 @@ def scoreNewTweets(filename, vocabulary_choice):
 def evaluate_scores(result_df):
     guess_status = []
     correct_guess = 0
-    evaluation_dictionary = dict.fromkeys(language_symbol.keys(),Evaluation()) 
+    evaluation_dictionary = {}
+    #create evaluation dict to store results
+    for lan in language_symbol.keys():
+        evaluation_dictionary[lan] = Evaluation()
+
     for index, row in result_df.iterrows():
+        evaluation_dictionary.get(row['guess']).all_predicted += 1
+        evaluation_dictionary.get(row['Language']).all_actual += 1
         if row['Language'] == row['guess']:
             guess_status.append('correct')
             correct_guess += 1
@@ -129,6 +135,13 @@ def evaluate_scores(result_df):
     result_df['Status'] = guess_status
     #calculate stats
     accuracy = correct_guess / len(result_df) 
+    for lang in evaluation_dictionary:
+        if evaluation_dictionary.get(lang).all_predicted != 0:
+            evaluation_dictionary.get(lang).precision = evaluation_dictionary.get(lang).true_positive / evaluation_dictionary.get(lang).all_predicted
+        if evaluation_dictionary.get(lang).all_actual != 0:
+            evaluation_dictionary.get(lang).recall = evaluation_dictionary.get(lang).true_positive / evaluation_dictionary.get(lang).all_actual
+        if evaluation_dictionary.get(lang).precision != 0 or evaluation_dictionary.get(lang).recall != 0:
+            evaluation_dictionary.get(lang).f1 = (2 * evaluation_dictionary.get(lang).precision * evaluation_dictionary.get(lang).recall) / (evaluation_dictionary.get(lang).precision+evaluation_dictionary.get(lang).recall)
     create_output_files(result_df, accuracy, evaluation_dictionary)
 
 
@@ -138,12 +151,32 @@ def create_output_files(result, accuracy, evaluation):
     #create evaluation file
     evaluation_filename = 'eval_'+str(vocabulary_integer)+'_'+str(size_integer)+'_'+str(smoothing)+'.txt'
     with open(trace_filename, 'w', encoding="utf-8") as file:
-        file.write(str(accuracy) + "\n")
-        file.close()
-
-    with open(evaluation_filename, 'w', encoding="utf-8") as file:
         for index, row in result.iterrows():
             file.write(row['TweetID'] + "  " + row['guess'] + "  "+ row['probability'] + "  " + row['Language'] + "  " + row['Status'] + "\n")
+        file.close()
+        
+    with open(evaluation_filename, 'w', encoding="utf-8") as file:
+        #accuracy
+        file.write(str(accuracy) + "\n")
+        #all precisions
+        for index in evaluation:
+            file.write(str(evaluation.get(index).precision) + "  " )
+        file.write("\n")
+        #all recalls
+        for index in evaluation:
+            file.write(str(evaluation.get(index).recall) + "  " )
+        file.write("\n")
+        #all f1s
+        macrof1 =0
+        weighedf1 = 0
+        for index in evaluation:
+            macrof1 += evaluation.get(index).f1
+            weighedf1 += (evaluation.get(index).f1 * evaluation.get(index).all_actual)
+            file.write(str(evaluation.get(index).f1) + "  " )
+        file.write("\n")
+        #macros
+        macrof1 = macrof1 / len(evaluation)
+        file.write(str(macrof1) + "  " + str(weighedf1/100))    
         file.close()
 
 
