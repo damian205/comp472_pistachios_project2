@@ -195,22 +195,23 @@ def prob_of_language_bigram(line, vocabulary_choice):
     best_probability = float('-inf')
     best_language = None
     for language in list_of_languages:
-        language_probablitity = math.log10(language.probability)
+        language_probability = math.log10(language.probability)
         for i in range(len(line)-1):
             bigram_substring = line[i] + line[i + 1]
             if vocabulary_choice == 2:
                 if valid_alpha_characters(bigram_substring):
                     if bigram_substring in language.bigram.index:
-                        language_probablitity *= math.log10(language.bigram.loc[bigram_substring]['Probability'])
+                        language_probability *= math.log10(language.bigram.loc[bigram_substring]['Probability'])
                     else:
                         language.bigram.loc['NOT APPEAR']['Instances'] += 1
                         language.bigram.loc['NOT APPEAR']['Probability'] = \
                             language.bigram.loc['NOT APPEAR']['Instances']/language.bigram['Instances'].sum()
+                        language_probability *= math.log10(language.unigram.loc['NOT APPEAR']['Probability'])
             else:
                 if valid_characters(bigram_substring):
-                    language_probablitity *= math.log10(language.bigram.loc[line[i], line[i + 1]])
-        if language_probablitity > best_probability:
-            best_probability = language_probablitity
+                    language_probability *= math.log10(language.bigram.loc[line[i], line[i + 1]])
+        if language_probability > best_probability:
+            best_probability = language_probability
             best_language = language.symbol   
     return (best_language, best_probability)
 
@@ -255,10 +256,11 @@ def prob_of_language_trigram(line, vocabulary_choice):
                         language.trigram.loc['NOT APPEAR']['Instances'] += 1
                         language.trigram.loc['NOT APPEAR']['Probability'] = \
                             language.trigram.loc['NOT APPEAR']['Instances']/language.trigram['Instances'].sum()
+                        language_probability *= math.log10(language.trigram.loc['NOT APPEAR']['Probability'])
             else:
                 if valid_characters(trigram_substring):
                     language_probability *= math.log10(language.trigram.loc[trigram_substring]['Probability'])
-        language_probability *= math.log10(language.trigram.loc['NOT APPEAR']['Probability'])
+
         if language_probability > best_probability:
             best_probability = language_probability
             best_language = language.symbol
