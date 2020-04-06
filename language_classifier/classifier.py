@@ -206,7 +206,7 @@ def prob_of_language_bigram(line, vocabulary_choice):
                         language.bigram.loc['NOT APPEAR']['Instances'] += 1
                         language.bigram.loc['NOT APPEAR']['Probability'] = \
                             language.bigram.loc['NOT APPEAR']['Instances']/language.bigram['Instances'].sum()
-                        language_probability *= math.log10(language.unigram.loc['NOT APPEAR']['Probability'])
+                        language_probability *= math.log10(language.bigram.loc['NOT APPEAR']['Probability'])
             else:
                 if valid_characters(bigram_substring):
                     language_probability *= math.log10(language.bigram.loc[line[i], line[i + 1]])
