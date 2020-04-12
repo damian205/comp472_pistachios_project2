@@ -201,15 +201,15 @@ def prob_of_language_bigram(line, vocabulary_choice):
             if vocabulary_choice == 2:
                 if valid_alpha_characters(bigram_substring):
                     if bigram_substring in language.bigram.index:
-                        language_probability *= math.log10(language.bigram.loc[bigram_substring]['Probability'])
+                        language_probability += math.log10(language.bigram.loc[bigram_substring]['Probability'])
                     else:
                         language.bigram.loc['NOT APPEAR']['Instances'] += 1
                         language.bigram.loc['NOT APPEAR']['Probability'] = \
                             language.bigram.loc['NOT APPEAR']['Instances']/language.bigram['Instances'].sum()
-                        language_probability *= math.log10(language.bigram.loc['NOT APPEAR']['Probability'])
+                        language_probability += math.log10(language.bigram.loc['NOT APPEAR']['Probability'])
             else:
                 if valid_characters(bigram_substring):
-                    language_probability *= math.log10(language.bigram.loc[line[i], line[i + 1]])
+                    language_probability += math.log10(language.bigram.loc[line[i], line[i + 1]])
         if language_probability > best_probability:
             best_probability = language_probability
             best_language = language.symbol   
@@ -226,15 +226,15 @@ def prob_of_language_unigram(line, vocabulary_choice):
             if vocabulary_choice == 2:
                 if valid_alpha_characters(character):
                     if character in language.unigram.index:
-                        language_probability *= math.log10(language.unigram.loc[character]['Probability'])
+                        language_probability += math.log10(language.unigram.loc[character]['Probability'])
                     else:
                         language.unigram.loc['NOT APPEAR']['Instances'] += 1
                         language.unigram.loc['NOT APPEAR']['Probability'] = \
                             language.unigram.loc['NOT APPEAR']['Instances'] / language.unigram['Instances'].sum()
-                        language_probability *= math.log10(language.unigram.loc['NOT APPEAR']['Probability'])
+                        language_probability += math.log10(language.unigram.loc['NOT APPEAR']['Probability'])
             else:
                 if valid_characters(character):
-                    language_probability *= math.log10(language.unigram.loc[character]['Probability'])
+                    language_probability += math.log10(language.unigram.loc[character]['Probability'])
         if language_probability > best_probability:
             best_probability = language_probability
             best_language = language.symbol
@@ -251,15 +251,15 @@ def prob_of_language_trigram(line, vocabulary_choice):
             if vocabulary_choice == 2:
                 if valid_alpha_characters(trigram_substring):
                     if trigram_substring in language.trigram.index:
-                        language_probability *= math.log10(language.trigram.loc[trigram_substring]['Probability'])
+                        language_probability += math.log10(language.trigram.loc[trigram_substring]['Probability'])
                     else:
                         language.trigram.loc['NOT APPEAR']['Instances'] += 1
                         language.trigram.loc['NOT APPEAR']['Probability'] = \
                             language.trigram.loc['NOT APPEAR']['Instances']/language.trigram['Instances'].sum()
-                        language_probability *= math.log10(language.trigram.loc['NOT APPEAR']['Probability'])
+                        language_probability += math.log10(language.trigram.loc['NOT APPEAR']['Probability'])
             else:
                 if valid_characters(trigram_substring):
-                    language_probability *= math.log10(language.trigram.loc[trigram_substring]['Probability'])
+                    language_probability += math.log10(language.trigram.loc[trigram_substring]['Probability'])
 
         if language_probability > best_probability:
             best_probability = language_probability
